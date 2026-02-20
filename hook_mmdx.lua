@@ -48,10 +48,10 @@ AddGamePostInit(function()
         local data = debug.getinfo(k.fn, "S")
         if string.match(data.source, "mods/workshop%-3144028272/modmain.lua") then
             local _funct = Upvaluehelper.GetUpvalue(k.fn, "funct")
-            if _funct then -- 还有另一个是中键收纳功能
+            if _funct then -- 通过判断是否有这个上值来区分是否为命名物品功能
                 funct = _funct
                 k.processor:RemoveHandler(k) -- 删除Alt键+左键命名物品功能
-            else
+            else -- 还有另一个是中键收纳功能
                 local fn_linedefined = debug.getinfo(k.fn).linedefined
                 if fn_linedefined > 970 and fn_linedefined < 1000 then -- 中键收纳当前定义在第985行
                     k.processor:RemoveHandler(k) -- 也是先删除后面自己加新的
@@ -223,99 +223,93 @@ AddComponentPostInit("playercontroller", function(self, inst)
     if inst ~= ThePlayer then return end
     ThePlayer:DoTaskInTime(0, function()
         local ActionQueuer = Upvaluehelper.FindUpvalue(self.OnControl, "ActionQueuer", "/mods/workshop%-3136701076/modmain.lua") -- 尝试获取黑化排队论的ActionQueuer
-        if ActionQueuer then
-            local env = ModManager:GetMod("workshop-3136701076").env
-            local INV_util = env.INV_util
-            local POS_util = env.POS_util
-            local MOD_util = env.MOD_util
-            local dont_controller_prefab = { -- 这就是我添加的部分，为了pick plus
-                ["luckysimulator"] = true -- 欧皇模拟器：老虎机
-            }
-            -- 修改行为学的SendControllerRPCSafely函数
-            function ActionQueuer:SendControllerRPCSafely(actioncode, item, target, modname)
-                if not dont_controller_prefab[target.prefab] and self:CanSeeTarget(target) then
-                    SendRPCToServer(RPC.ControllerUseItemOnSceneFromInvTile, actioncode, item, target, modname)
-                else
-                    if INV_util:GetActiveItem() then
-                        SendRPCToServer(RPC.LeftClick, actioncode, target:GetPosition().x,
-                            target:GetPosition().z,
-                            target, nil, nil, true, modname)
-                    else
-                        POS_util:GoToPoint(target:GetPosition().x,
-                            target:GetPosition().z)
-                    end
-                end
-            end
+        if not ActionQueuer then return end
 
-            local allowed_actions = Upvaluehelper.GetUpvalue(ActionQueuer.GetAction, "allowed_actions")
-            if allowed_actions then
-                -- 修改关于晾肉架的操作
-                allowed_actions['STORE'].rpc = function(act)
-                    -- 晾肉架批量塞入优化
-                    if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
-                        -- 一开始时使用STORE驱动走路（唯一能让玩家走过去的RPC）
-                        if act.time == 0 then
-                            act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
+        local env = ModManager:GetMod("workshop-3136701076").env
+        -- local INV_util = env.INV_util
+        -- local POS_util = env.POS_util
+        local MOD_util = env.MOD_util
+        local dont_controller_prefab = {
+            ["luckysimulator"] = true -- 欧皇模拟器：老虎机
+        }
+        -- 修改行为学的SendControllerRPCSafely函数
+        local old_SendControllerRPCSafely = ActionQueuer.SendControllerRPCSafely
+        function ActionQueuer:SendControllerRPCSafely(actioncode, item, target, modname, ...)
+            if not dont_controller_prefab[target.prefab] then
+                SendRPCToServer(RPC.ControllerUseItemOnSceneFromInvTile, actioncode, item, target, modname, ...)
+            else
+                old_SendControllerRPCSafely(actioncode, item, target, modname, ...)
+            end
+        end
+
+        local allowed_actions = Upvaluehelper.GetUpvalue(ActionQueuer.GetAction, "allowed_actions")
+        if allowed_actions then
+            -- 修改关于晾肉架的操作
+            allowed_actions['STORE'].rpc = function(act)
+                -- 晾肉架批量塞入优化
+                if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
+                    -- 一开始时使用STORE驱动走路（唯一能让玩家走过去的RPC）
+                    if act.time == 0 then
+                        act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
+                    end
+
+                    local container = act.target.replica and act.target.replica.container
+                    if container and container:IsOpenedBy(ThePlayer) then
+                        -- 从物品栏塞入
+                        for k, v in pairs(ThePlayer.replica.inventory:GetItems() or {}) do
+                            if v.prefab == act.item.prefab then
+                                SendRPCToServer(RPC.MoveInvItemFromAllOfSlot, k, act.target)
+                            end
                         end
 
-                        local container = act.target.replica and act.target.replica.container
-                        if container and container:IsOpenedBy(ThePlayer) then
-                            -- 从物品栏塞入
-                            for k, v in pairs(ThePlayer.replica.inventory:GetItems() or {}) do
-                                if v.prefab == act.item.prefab then
-                                    SendRPCToServer(RPC.MoveInvItemFromAllOfSlot, k, act.target)
-                                end
-                            end
-
-                            -- 从背包塞入
-                            for con in pairs(ThePlayer.replica.inventory:GetOpenContainers() or {}) do
-                                if con and con.replica and con.replica.container and con ~= act.target then
-                                    for k, v in pairs(con.replica.container:GetItems()) do
-                                        if v.prefab == act.item.prefab then
-                                            SendRPCToServer(RPC.MoveItemFromAllOfSlot, k, con, act.target)
-                                        end
+                        -- 从背包塞入
+                        for con in pairs(ThePlayer.replica.inventory:GetOpenContainers() or {}) do
+                            if con and con.replica and con.replica.container and con ~= act.target then
+                                for k, v in pairs(con.replica.container:GetItems()) do
+                                    if v.prefab == act.item.prefab then
+                                        SendRPCToServer(RPC.MoveItemFromAllOfSlot, k, con, act.target)
                                     end
                                 end
                             end
                         end
-                    else
-                        -- 非晾肉架：原逻辑
-                        act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
-                        if not act.self:CanSeeTarget(act.target) then
-                            for i = 1, 10 do
+                    end
+                else
+                    -- 非晾肉架：原逻辑
+                    act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
+                    if not act.self:CanSeeTarget(act.target) then
+                        for i = 1, 10 do
+                            SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
+                        end
+                    end
+                end
+            end
+            allowed_actions['STORE'].controllertable = {
+                needreturnactiveitem = function(act)
+                    -- 晒肉时将鼠标上的物品放回物品栏
+                    return act.item and act.item:HasTag("dryable") and
+                            act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab]
+                end,
+            }
+            allowed_actions['STORE'].addtimefn = function(act)
+                return act.target and act.target.replica and act.target.replica.container and
+                    -- 想要晒肉时直接addtime，确保SendControllerRPCSafely只运行一次
+                    (allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] or act.target.replica.container:IsOpenedBy(act.self.inst))
+            end
+
+            allowed_actions['RUMMAGE'].reselectfn = function(act)
+                if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
+                    local num = act.target.replica.container and act.target.replica.container:GetNumSlots() or 3
+                    for i = 1, num do
+                        SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
+                    end
+                    -- 如果是晾肉巨架且里面有盐晶，这段代码就会生效
+                    MOD_util:DoTaskInTime(0.2, function()
+                        if act and act.target and act.target.replica and act.target.replica.container and #act.target.replica.container:GetItems() ~= 0 then
+                            for i = 1, num do
                                 SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
                             end
                         end
-                    end
-                end
-                allowed_actions['STORE'].controllertable = {
-                    needreturnactiveitem = function(act)
-                        -- 晒肉时将鼠标上的物品放回物品栏
-                        return act.item and act.item:HasTag("dryable") and
-                                act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab]
-                    end,
-                }
-                allowed_actions['STORE'].addtimefn = function(act)
-                    return act.target and act.target.replica and act.target.replica.container and
-                        -- 想要晒肉时直接addtime，确保SendControllerRPCSafely只运行一次
-                        (allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] or act.target.replica.container:IsOpenedBy(act.self.inst))
-                end
-
-                allowed_actions['RUMMAGE'].reselectfn = function(act)
-                    if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
-                        local num = act.target.replica.container and act.target.replica.container:GetNumSlots() or 3
-                        for i = 1, num do
-                            SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
-                        end
-                        -- 如果是晾肉巨架且里面有盐晶，这段代码就会生效
-                        MOD_util:DoTaskInTime(0.2, function()
-                            if act and act.target and act.target.replica and act.target.replica.container and #act.target.replica.container:GetItems() ~= 0 then
-                                for i = 1, num do
-                                    SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
-                                end
-                            end
-                        end)
-                    end
+                    end)
                 end
             end
         end
