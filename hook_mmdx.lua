@@ -189,6 +189,7 @@ AddGamePostInit(function()
         ["dragonflychest"] = true, -- 龙鳞宝箱
         ["phonograph"] = true, -- 留声机
         ["firesuppressor"] = true, -- 雪球机
+        ["winona_catapult"] = true, -- 投石机
     }
     local old_selectwork = selectwork
     selectwork = function(ent, ...)
