@@ -226,8 +226,8 @@ AddComponentPostInit("playercontroller", function(self, inst)
         if not ActionQueuer then return end
 
         local env = ModManager:GetMod("workshop-3136701076").env
-        -- local INV_util = env.INV_util
-        -- local POS_util = env.POS_util
+        local INV_util = env.INV_util
+        local POS_util = env.POS_util
         local MOD_util = env.MOD_util
         local dont_controller_prefab = {
             ["luckysimulator"] = true -- 欧皇模拟器：老虎机
@@ -235,10 +235,17 @@ AddComponentPostInit("playercontroller", function(self, inst)
         -- 修改行为学的SendControllerRPCSafely函数
         local old_SendControllerRPCSafely = ActionQueuer.SendControllerRPCSafely
         function ActionQueuer:SendControllerRPCSafely(actioncode, item, target, modname, ...)
-            if not dont_controller_prefab[target.prefab] then
-                SendRPCToServer(RPC.ControllerUseItemOnSceneFromInvTile, actioncode, item, target, modname, ...)
+            if dont_controller_prefab[target.prefab] then
+                if INV_util:GetActiveItem() then
+                    SendRPCToServer(RPC.LeftClick, actioncode, target:GetPosition().x,
+                        target:GetPosition().z,
+                        target, nil, nil, true, modname)
+                else
+                    POS_util:GoToPoint(target:GetPosition().x,
+                        target:GetPosition().z)
+                end
             else
-                old_SendControllerRPCSafely(actioncode, item, target, modname, ...)
+                old_SendControllerRPCSafely(self, actioncode, item, target, modname, ...)
             end
         end
 
