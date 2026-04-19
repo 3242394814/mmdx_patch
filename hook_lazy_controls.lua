@@ -264,7 +264,9 @@ AddComponentPostInit("playercontroller", function(self, inst)
 
                 local function canactive()
                     if not GLOBAL.TheFrontEnd then return true end
-                    if InGamePlay() and not GLOBAL.TheFrontEnd:GetActiveScreen():IsEditing() then
+                    local ActiveScreen = GLOBAL.TheFrontEnd and GLOBAL.TheFrontEnd:GetActiveScreen()
+                    if not ActiveScreen then return false end
+                    if InGamePlay() and not (ActiveScreen.IsEditing and ActiveScreen:IsEditing()) then
                         return true
                     end
                     return false
@@ -275,6 +277,8 @@ AddComponentPostInit("playercontroller", function(self, inst)
                     ActionQueuer:SelectAllNearbyEnts(TheInput:IsKeyDown(KEY_LSHIFT))
                 end)
             end
+        else
+            MOD_util:Warning("获取 黑化排队论 模组的 ActionQueuer 失败")
         end
     end)
 end)

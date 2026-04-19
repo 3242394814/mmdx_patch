@@ -81,6 +81,7 @@ AddGamePostInit(function()
     end)
 
     -- 可靠的中键收纳
+    local enabled_showme_or_insight = KnownModIndex:IsModEnabledAny("workshop-2189004162") or MOD_RPC.ShowMeSHint -- 检测是否开启 Show Me 或者 Insight 模组
     TheInput:AddMouseButtonHandler(function(button, down, x, y)
         if not down then return false end
         if button == MOUSEBUTTON_MIDDLE and not TheInput:IsKeyDown(KEY_LALT) and not TheInput:IsKeyDown(KEY_LCTRL) and not TheInput:IsKeyDown(KEY_LSHIFT) then
@@ -108,11 +109,11 @@ AddGamePostInit(function()
                         -- end
                         for k,v in pairs(data) do
                             if type(v) == 'table' and v.prefab == item.prefab then
-                                if not data.full then
-                                    return true
+                                if not data.full then -- 箱子没满
+                                    return not enabled_showme_or_insight or Memory:CheckShowmeAndInsight(inst, item.prefab) -- Show Me 或者 Insight 也表示箱子有这个物品才行 -- true
                                 elseif data.full then
-                                    if v.isfull ~= true then
-                                        return true
+                                    if v.isfull ~= true then -- 堆叠没满
+                                        return not enabled_showme_or_insight or Memory:CheckShowmeAndInsight(inst, item.prefab) -- Show Me 或者 Insight 也表示箱子有这个物品才行 -- true
                                     end
                                 end
                             end
@@ -212,7 +213,7 @@ AddGamePostInit(function()
     selectwork = function(ent, ...)
         local EntityUnderMouse = TheInput:GetWorldEntityUnderMouse()
         if EntityUnderMouse and EntityUnderMouse.prefab and black_prefab[EntityUnderMouse.prefab] then return end
-        if --[[TheInput:IsKeyDown(KEY_LSHIFT) or]] TheInput:IsKeyDown(KEY_CTRL) or TheInput:IsKeyDown(KEY_ALT) then return end
+        if --[[TheInput:IsKeyDown(KEY_LSHIFT) or]] TheInput:IsKeyDown(KEY_LCTRL) or TheInput:IsKeyDown(KEY_LALT) then return end
         return old_selectwork(ent, ...)
     end
     Upvaluehelper.SetUpvalue(fn, selectwork, "selectwork")
@@ -271,6 +272,27 @@ AddComponentPostInit("playercontroller", function(self, inst)
 
         local allowed_actions = Upvaluehelper.GetUpvalue(ActionQueuer.GetAction, "allowed_actions")
         if allowed_actions then
+
+            -- 可靠的快速捡物品
+            local pickup_pst_flag = false
+            local _breakfn = allowed_actions["PICKUP"].breakfn
+            allowed_actions["PICKUP"].breakfn = function(act)
+                local selecttable = act.self and act.self:GetSelectedEnt(act.target)
+                if selecttable then
+                    if selecttable.rightclick then -- 右键，走原来的不可靠快速捡东西
+                        return _breakfn(act)
+                    else -- 左键，使用我写的快速捡东西
+                        local pickup_pst_anim = act.self.inst.AnimState:IsCurrentAnimation("pickup_pst")
+                        if act.time > 0.1 and (pickup_pst_anim) and pickup_pst_flag and act.self:HaveAnotherSelectedEnt(act.target) then
+                            pickup_pst_flag = false
+                            return true
+                        elseif not pickup_pst_anim then
+                            pickup_pst_flag = true
+                        end
+                    end
+                end
+            end
+
             -- 解决砍巨石枝时卡顿的问题
             local chop_rock_tree_flag = false
             allowed_actions["CHOP"].rpc = function(act)
