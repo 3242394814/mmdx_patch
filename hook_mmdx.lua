@@ -322,17 +322,21 @@ AddComponentPostInit("playercontroller", function(self, inst)
             end
 
             -- 修改关于晾肉架的操作
+            local first_time_flag
+            allowed_actions['STORE'].act_pre_fn = function(act)
+                first_time_flag = true
+            end
             allowed_actions['STORE'].rpc = function(act)
                 -- 晾肉架批量塞入优化
                 if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
                     -- 一开始时使用STORE驱动走路
-                    if act.time == 0 then
+                    if first_time_flag then
+                        first_time_flag = false
                         act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
                     end
 
                     local container = act.target.replica and act.target.replica.container
                     if container and container:IsOpenedBy(ThePlayer) then
-
                         -- 从背包塞入
                         for con in pairs(ThePlayer.replica.inventory:GetOpenContainers() or {}) do
                             if con and con.replica and con.replica.container and con ~= act.target then
@@ -368,11 +372,12 @@ AddComponentPostInit("playercontroller", function(self, inst)
                             act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab]
                 end,
             }
-            allowed_actions['STORE'].addtimefn = function(act)
-                return
-                    act.target and
-                    (allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] or -- 想要晒肉时直接addtime，确保SendControllerRPCSafely只运行一次
-                    act.target.replica and act.target.replica.container and act.target.replica.container:IsOpenedBy(act.self.inst))
+
+            local old_STORE_breakfn = allowed_actions['STORE'].breakfn
+            allowed_actions['STORE'].breakfn = function(act)
+                local res = old_STORE_breakfn(act)
+                if res then first_time_flag = true end
+                return res
             end
 
             -- 兼容【古川笠的快速采集】模组，使用flag标记阻止重复开启容器
@@ -469,46 +474,6 @@ if KnownModIndex:IsModEnabledAny("workshop-3217951008") then
         ls.teatree_nut_cooked = { duration = 120, name = "免疫花粉症" } -- 熟茶籽
     else
         MOD_util:Warning("获取 buff计时器 模组的 Bufftimer 失败")
-    end
-end
-
----------------------------------------------------------------------------------------------------------------------------------------------------------
-
--- 修改show me血条模组
-if KnownModIndex:IsModEnabledAny("workshop-3620271154") then
-    local showme_health = Upvaluehelper.Getmoddata("workshop-3620271154", "GamePostInit", nil, "showme_health")
-    if showme_health then
-        -- 解决鼠标指着的物品不显示信息的问题
-        local showme_health_DDOS_server = showme_health.DDOS_server
-        function showme_health:DDOS_server()
-            if showme_health.close then return end
-            if not ThePlayer then return end
-
-            -- 检查鼠标下是否指着物品
-            local target = _G.TheInput:GetHUDEntityUnderMouse()
-            if target ~= nil then
-                local function par(w)
-                    return w.parent and (w.parent.item or par(w.parent)) or nil
-                end
-                target = target.widget ~= nil and par(target.widget)
-            else
-                target = _G.TheInput:GetWorldEntityUnderMouse()
-            end
-            if type(target) ~= "table" or not target.GUID then
-                target = nil
-            end
-            if target ~= nil then
-                local time = target._last_ddos_time
-                if not time or (GetTime() - time > 1) then -- 鼠标指的物品超过1秒未更新则立刻更新
-                    target._last_ddos_time = GetTime()
-                    return
-                end
-            end
-
-            return showme_health_DDOS_server(self)
-        end
-    else
-        MOD_util:Warning("获取Show Me血条模组的 showme_health 失败")
     end
 end
 
