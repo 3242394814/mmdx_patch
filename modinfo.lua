@@ -9,7 +9,7 @@ description = "众所周知，【萌萌的新】有很多非常优秀的MOD，�
 author = "冰冰羊"
 
 -- 版本
-version = "2026-04-30"
+version = "2026-05-29-A"
 
 -- klei官方论坛地址，为空则默认是工坊的地址
 -- forumthread = ""
@@ -30,5 +30,33 @@ all_clients_require_mod = false
 -- 饥荒api版本，固定填10
 api_version = 10
 
+---@param label string|nil 标题
+---@return table
+local function SkipSpace(label)
+	return { name = "",label = label, hover = "", options = { { description = "", data = false }, }, default = false}
+end
+
 -- mod的配置项
-configuration_options = {}
+configuration_options =
+{
+    SkipSpace("记忆力模组"),
+    {
+        name = "refreshhighlight_range",
+        label = "搜索范围",
+        hover = "选中一个物品后，搜索多少范围内的箱子是否有此物品",
+        options =
+        {
+            {description = "20", data = 20},
+            {description = "25", data = 25},
+            {description = "30", data = 30},
+            {description = "35", data = 35},
+            {description = "40", data = 40},
+            {description = "45", data = 45},
+            {description = "50", data = 50, hover = "默认值"},
+            {description = "55", data = 55},
+            {description = "60", data = 60},
+        },
+        default = 50,
+    },
+    SkipSpace("如果你想要其它模组设置，请留言让我添加")
+}
