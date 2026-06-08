@@ -16,6 +16,7 @@ AddGamePostInit(function()
 
     bancontainers.cookpot = true -- 烹饪锅
     bancontainers.dragonflyfurnace = true -- 龙鳞火炉
+    bancontainers.meatrack = true -- 晾肉架
 
     local old_CheckShowmeAndInsight = Memory.CheckShowmeAndInsight
     Memory.CheckShowmeAndInsight = function(self, inst, prefab, ...)
