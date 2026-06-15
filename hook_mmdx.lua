@@ -334,23 +334,6 @@ AddComponentPostInit("playercontroller", function(self, inst)
                     flag = true
                 end
             end
-
-            allowed_actions['RUMMAGE'].exit_loop_fn = function(act)
-                if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
-                    local num = act.target.replica.container and act.target.replica.container:GetNumSlots() or 3
-                    for i = 1, num do
-                        SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
-                    end
-                    -- 如果是晾肉巨架且里面有盐晶，这段代码就会生效
-                    MOD_util:DoTaskInTime(0.2, function()
-                        if act and act.target and act.target.replica and act.target.replica.container and #act.target.replica.container:GetItems() ~= 0 then
-                            for i = 1, num do
-                                SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
-                            end
-                        end
-                    end)
-                end
-            end
         end
     end)
 end)
