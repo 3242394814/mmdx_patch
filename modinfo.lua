@@ -9,7 +9,7 @@ description = "众所周知，【萌萌的新】有很多非常优秀的MOD，�
 author = "冰冰羊"
 
 -- 版本
-version = "2026-06-09"
+version = "2026-06-15"
 
 -- klei官方论坛地址，为空则默认是工坊的地址
 -- forumthread = ""
@@ -52,11 +52,13 @@ configuration_options =
             {description = "35", data = 35},
             {description = "40", data = 40},
             {description = "45", data = 45},
-            {description = "50", data = 50, hover = "默认值"},
+            {description = "50", data = 50},
             {description = "55", data = 55},
             {description = "60", data = 60},
+            {description = "65", data = 65, hover = "默认值"},
+            {description = "70", data = 70},
         },
-        default = 50,
+        default = 65,
     },
     SkipSpace("如果你想要其它模组设置，请留言让我添加")
 }

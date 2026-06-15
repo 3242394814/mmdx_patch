@@ -312,49 +312,6 @@ AddComponentPostInit("playercontroller", function(self, inst)
             end
 
             -- 修改关于晾肉架的操作
-            local first_time_flag
-            allowed_actions['STORE'].act_pre_fn = function(act)
-                first_time_flag = true
-            end
-            allowed_actions['STORE'].rpc = function(act)
-                -- 晾肉架批量塞入优化
-                if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
-                    -- 一开始时使用STORE驱动走路
-                    if first_time_flag then
-                        first_time_flag = false
-                        act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
-                    end
-
-                    local container = act.target.replica and act.target.replica.container
-                    if container and container:IsOpenedBy(ThePlayer) then
-                        -- 从背包塞入
-                        for con in pairs(ThePlayer.replica.inventory:GetOpenContainers() or {}) do
-                            if con and con.replica and con.replica.container and con ~= act.target then
-                                for k, v in pairs(con.replica.container:GetItems()) do
-                                    if v.prefab == act.item.prefab then
-                                        SendRPCToServer(RPC.MoveItemFromAllOfSlot, k, con, act.target)
-                                    end
-                                end
-                            end
-                        end
-
-                        -- 从物品栏塞入
-                        for k, v in pairs(ThePlayer.replica.inventory:GetItems() or {}) do
-                            if v.prefab == act.item.prefab then
-                                SendRPCToServer(RPC.MoveInvItemFromAllOfSlot, k, act.target)
-                            end
-                        end
-                    end
-                else
-                    -- 非晾肉架：原逻辑
-                    act.self:SendControllerRPCSafely(ACTIONS.STORE.code, act.item, act.target)
-                    if not act.self:CanSeeTarget(act.target) then
-                        for i = 1, 10 do
-                            SendRPCToServer(RPC.MoveItemFromAllOfSlot, i, act.target)
-                        end
-                    end
-                end
-            end
             allowed_actions['STORE'].controllertable = {
                 needreturnactiveitem = function(act)
                     -- 晒肉时将鼠标上的物品放回物品栏
@@ -362,13 +319,6 @@ AddComponentPostInit("playercontroller", function(self, inst)
                             act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab]
                 end,
             }
-
-            local old_STORE_breakfn = allowed_actions['STORE'].breakfn
-            allowed_actions['STORE'].breakfn = function(act)
-                local res = old_STORE_breakfn(act)
-                if res then first_time_flag = true end
-                return res
-            end
 
             -- 兼容【古川笠的快速采集】模组，使用flag标记阻止重复开启容器
             if KnownModIndex:IsModEnabledAny("workshop-2158549297") then
@@ -385,7 +335,7 @@ AddComponentPostInit("playercontroller", function(self, inst)
                 end
             end
 
-            allowed_actions['RUMMAGE'].reselectfn = function(act)
+            allowed_actions['RUMMAGE'].exit_loop_fn = function(act)
                 if act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then
                     local num = act.target.replica.container and act.target.replica.container:GetNumSlots() or 3
                     for i = 1, num do
