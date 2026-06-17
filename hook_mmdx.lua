@@ -285,15 +285,20 @@ AddComponentPostInit("playercontroller", function(self, inst)
 
             -- 解决砍巨石枝时卡顿的问题
             local chop_rock_tree_flag = false
+            local DealWx78_spinact = Upvaluehelper.GetUpvalue(allowed_actions["CHOP"].rpc, "DealWx78_spinact")
             allowed_actions["CHOP"].rpc = function(act)
                 local target = act.target
-                if target and target:HasTag("rock_tree") then
+                if DealWx78_spinact(act, ACTIONS.CHOP.code) then
+                    return
+                end
+                if target and target:HasTag("rock_tree") then --tree_rock1
                     local anim = ENT_util:GetAnimation(target)
                     if anim and (anim:find('fall_pre') or anim:find("fall_miss") or anim:find("fall_bounce")) then
                         if not chop_rock_tree_flag then
-                            local pos = POS_util:CalculateAimPos(ThePlayer, target, 0,
-                                (target:HasTag("tree_rock1") and -3 or -4) - 0.5)
-                            local speeditem = ActionQueuer:HasAddSpeedEquipment()
+                            local pos = POS_util:CalculateAimPos(target, ThePlayer, 0,
+                                (target:HasTag("tree_rock1") and 3 or 4) + 0.5)
+                            local speeditem
+                            speeditem = ActionQueuer:HasAddSpeedEquipment()
                             ActionQueuer:EquipItem(speeditem)
                             ActionQueuer.waiting_for_break = 1
                             POS_util:GoToPoint(pos.x, pos.z)
