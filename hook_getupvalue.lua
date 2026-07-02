@@ -63,19 +63,7 @@ if KnownModIndex:IsModEnabledAny("workshop-3156267875") then
     end
 end
 
--- Showme血条
-if KnownModIndex:IsModEnabledAny("workshop-3620271154") then
-    AddGamePostInit(function()
-        local showme_hint_rpc = MOD_RPC.ShowMeSHint and MOD_RPC.ShowMeSHint.Hint
-        if showme_hint_rpc then
-            local classdef = require "widgets/hoverer"
-            local constructor = classdef._ctor
-            local mmdx_MOD_util = Upvaluehelper.FindUpvalue(constructor, "MOD_util", "workshop%-3620271154/modmain.lua")
-            if mmdx_MOD_util then
-                override_getupvalue_helper(mmdx_MOD_util)
-            else
-                MOD_util:Warning("未找到MOD_util")
-            end
-        end
-    end)
-end
+-- 通用
+-- if rawget(_G, "MOD_util") then
+--     override_getupvalue_helper(_G.MOD_util)
+-- end
