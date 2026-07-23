@@ -209,6 +209,10 @@ AddComponentPostInit("playercontroller", function(self, inst)
                         ["lunar_seed"] = true, -- 天体珠宝
                         ["meatrack"] = true, -- 晾肉架（为了放肉进去）
                     }
+                    local black_prefab = { -- 排除的Prefab
+                        boat_ancient = true, -- 船
+                        boat = true, -- 船
+                    }
                     local black_action_id = { -- 排除的动作
                         ["ATTACK"] = true, -- 攻击
                     }
@@ -218,7 +222,7 @@ AddComponentPostInit("playercontroller", function(self, inst)
                             if IsValidEntity(ent) and not self:IsSelectedEntity(ent) and (test_fn == nil or test_fn(ent)) then
                                 local rightclick, act = is_rightclick(ent, is_right_list)
                                 if rightclick ~= nil then
-                                    if not black_action_id[act.action.id] then
+                                    if not black_action_id[act.action.id] and not black_prefab[act.target.prefab] then
                                         if act.action.id == "PICKUP" then rightclick = false end
                                         self:SelectEntity(ent, act.action.id, nil, nil, rightclick) -- 黑化排队论改了这个传的参数 原版：(ent, rightclick) 黑化排队论：(ent, actid, item, specialtag, rightclick)
                                         table.insert(selected, { ent = ent, right = rightclick })
@@ -282,3 +286,137 @@ AddComponentPostInit("playercontroller", function(self, inst)
         end
     end)
 end)
+
+-- 修复Lazy Controls，Shift+左键移动物品函数太老引起的BUG
+local bundle_first = _G.GetModConfigData("bundle_first", "workshop-2111412487")
+local stewer_first = _G.GetModConfigData("stewer_first", "workshop-2111412487")
+if bundle_first or stewer_first then
+    local classdef = require("widgets/invslot")
+    local constructor = classdef._ctor
+    local function filter(fn)
+        local name = debug.getupvalue(fn, 1)
+        return name == "bundle_first"
+    end
+    local _, fn_i, pre_fn = Upvaluehelper.FindUpvalue(constructor, "postfn", filter) -- 搜索Lazy Controls模组用于做出修改的函数
+    if fn_i and pre_fn then
+        local newfn = function(self, inst)
+            local FindBestContainer = Upvaluehelper.GetUpvalue(self.TradeItem, "FindBestContainer")
+            self.TradeItem = function(self, stack_mod)
+                local slot_number = self.num
+                local character = self.owner
+                local inventory = character and character.replica.inventory or nil
+                local container = self.container
+                local container_item = container and (container.IsReadOnlyContainer == nil or not container:IsReadOnlyContainer()) and container:GetItemInSlot(slot_number) or nil
+
+                if character ~= nil and inventory ~= nil and container_item ~= nil then
+                    local opencontainers = inventory:GetOpenContainers()
+                    local haswriteablecontainer = false
+                    for opencontainer, _ in pairs(opencontainers) do
+                        if opencontainer.replica.container and not opencontainer.replica.container:IsReadOnlyContainer() then
+                            haswriteablecontainer = true
+                            break
+                        end
+                    end
+                    if not haswriteablecontainer then
+                        return
+                    end
+
+                    local overflow = inventory:GetOverflowContainer()
+                    local backpack = nil
+                    if overflow ~= nil and overflow:IsOpenedBy(character) then
+                        backpack = overflow.inst
+                        overflow = backpack.replica.container
+                        if overflow == nil then
+                            backpack = nil
+                        end
+                    else
+                        overflow = nil
+                    end
+
+                    -- Changed Part
+                    local bundles = {}
+                    for k in pairs(opencontainers) do
+                        if k:HasTag("bundle") then
+                            bundles[k] = true
+                        end
+                    end
+                    local stewers = {}
+                    for k in pairs(opencontainers) do
+                        if k:HasTag("stewer") then
+                            stewers[k] = true
+                        end
+                    end
+                    -- Changed Part
+
+                    --find our destination container
+                    local dest_inst = nil
+                    if container == inventory then
+                        local playercontainers = backpack ~= nil and { [backpack] = true } or nil
+                        dest_inst = bundle_first and FindBestContainer(self, container_item, bundles) -- Changed Part
+                            or stewer_first and FindBestContainer(self, container_item, stewers)      -- Changed Part
+                            or FindBestContainer(self, container_item, opencontainers, playercontainers)
+                            or FindBestContainer(self, container_item, playercontainers)
+                    elseif container == overflow then
+                        dest_inst = bundle_first and FindBestContainer(self, container_item, bundles) -- Changed Part
+                            or stewer_first and FindBestContainer(self, container_item, stewers)      -- Changed Part
+                            or FindBestContainer(self, container_item, opencontainers, { [backpack] = true })
+                            or (inventory:IsOpenedBy(character)
+                                and FindBestContainer(self, container_item, { [character] = true })
+                                or nil)
+                    else
+                        local exclude_containers = { [container.inst] = true }
+                        if backpack ~= nil then
+                            exclude_containers[backpack] = true
+                        end
+                        dest_inst = FindBestContainer(self, container_item, opencontainers, exclude_containers) or
+                            (inventory:IsOpenedBy(character) and character or backpack)
+                    end
+
+                    --if a destination container/inv is found...
+                    if dest_inst ~= nil then
+                        local takecount
+                        if inventory and inventory ~= container then -- Variable character cannot be nil from above.
+                            local maxtakecountfunction = GetDesiredMaxTakeCountFunction(container_item.prefab)
+                            if maxtakecountfunction then
+                                takecount = maxtakecountfunction(character, inventory, container_item, container)
+                            end
+                        end
+                        if takecount then
+                            if takecount > 0 then
+                                -- Take a set number from a slot if possible.
+                                if stack_mod then
+                                    takecount = math.max(math.floor(takecount / 2), 1)
+                                end
+                                if container_item.replica.inventoryitem and
+                                    container_item.replica.inventoryitem:IsLockedInSlot() and
+                                    (container_item.replica.stackable and container_item.replica.stackable:StackSize() or 1) <= takecount
+                                then
+                                    TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_negative")
+                                else
+                                    container:MoveItemFromCountOfSlot(slot_number, dest_inst, takecount)
+                                    TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_object")
+                                end
+                            else
+                                -- Block taking anything if this override exists.
+                                TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_negative")
+                            end
+                        elseif stack_mod and
+                            container_item.replica.stackable ~= nil and
+                            container_item.replica.stackable:IsStack() then
+                            container:MoveItemFromHalfOfSlot(slot_number, dest_inst)
+                            TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_object")
+                        elseif container_item.replica.inventoryitem and container_item.replica.inventoryitem:IsLockedInSlot() then
+                            TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_negative")
+                        else
+                            container:MoveItemFromAllOfSlot(slot_number, dest_inst)
+                            TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_object")
+                        end
+                    else
+                        TheFocalPoint.SoundEmitter:PlaySound("dontstarve/HUD/click_negative")
+                    end
+                end
+            end
+        end
+        debug.setupvalue(pre_fn, fn_i, newfn)
+    end
+end
