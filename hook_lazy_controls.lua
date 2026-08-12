@@ -343,6 +343,7 @@ if _G.KnownModIndex:IsModEnabledAny("workshop-3136701076") then -- 检查黑化�
                             ["alterguardianhat"] = true, -- 启迪之冠，别想跟我抢！
                             ["lunar_seed"] = true, -- 天体珠宝
                             ["meatrack"] = true, -- 晾肉架（为了放肉进去）
+                            ["meatrack_hermit_multi"] = true, -- 晾肉巨架
                         }
                         local black_prefab = { -- 排除的Prefab
                             boat_ancient = true, -- 船
