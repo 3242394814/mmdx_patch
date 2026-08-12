@@ -8,7 +8,7 @@ local modconfig = {
 AddGamePostInit(function()
     if not rawget(_G, "GetContainer_mmdxdata") then return end
 
-    local Memory = GLOBAL.MMDX_MEMORY
+    local Memory = _G.MMDX_MEMORY
     if not Memory then MOD_util:Warning("获取 记忆力 模组的 Memory 失败") return end
     local bancontainers = Upvaluehelper.GetUpvalue(Memory.GetContainer_mmdxdata, "bancontainers")
 
@@ -262,7 +262,6 @@ AddComponentPostInit("playercontroller", function(self, inst)
 
         local allowed_actions = Upvaluehelper.GetUpvalue(ActionQueuer.GetAction, "allowed_actions")
         if allowed_actions then
-
             -- 可靠的快速捡物品
             local pickup_pst_flag = false
             local _breakfn = allowed_actions["PICKUP"].breakfn
@@ -340,6 +339,15 @@ AddComponentPostInit("playercontroller", function(self, inst)
                 end
             end
         end
+
+        -- 排队论工作的时候不因切屏（游戏判定为你按住了强制检查键）影响切装备
+        local _IsControlPressed = _G.TheInput.IsControlPressed
+        function _G.TheInput:IsControlPressed(key)
+            if ActionQueuer.action_thread ~= nil and (key == CONTROL_FORCE_INSPECT) then -- 排队论工作时，强制检查键按钮始终判为未按下
+                return false
+            end
+            return _IsControlPressed(self, key)
+        end
     end)
 end)
 
@@ -409,7 +417,7 @@ end
 
 -- 修改防止卡键模组（你怎么只防LCTRL、LALT、LSHIFT，不知道其它模组判断用的是CTRL、ALT、SHIFT吗）
 if KnownModIndex:IsModEnabledAny("workshop-3127527186") then
-    local status = Upvaluehelper.FindUpvalue(GLOBAL.TheInput.IsKeyDown, "status", "workshop%-3127527186")
+    local status = Upvaluehelper.FindUpvalue(_G.TheInput.IsKeyDown, "status", "workshop%-3127527186")
     if status then
         status[KEY_ALT] = function()
             return TheInput:IsControlPressed(CONTROL_FORCE_INSPECT) or TheInput:IsKeyDown(KEY_RALT)
