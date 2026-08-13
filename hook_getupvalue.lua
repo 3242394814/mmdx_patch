@@ -64,6 +64,6 @@ if KnownModIndex:IsModEnabledAny("workshop-3156267875") then
 end
 
 -- 通用
--- if rawget(_G, "MOD_util") then
---     override_getupvalue_helper(_G.MOD_util)
--- end
+if rawget(_G, "MOD_util") then
+    override_getupvalue_helper(_G.MOD_util)
+end

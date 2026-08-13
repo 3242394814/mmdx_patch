@@ -10,7 +10,7 @@ if bundle_first or stewer_first then
         local name = debug.getupvalue(fn, 1)
         return name == "bundle_first"
     end
-    local _, fn_i, pre_fn = Upvaluehelper.FindUpvalue(constructor, "postfn", filter) -- 搜索Lazy Controls模组用于做出修改的函数
+    local _, fn_i, pre_fn = Upvaluehelper.FindUpvalue(constructor, "postfn", nil, filter) -- 搜索Lazy Controls模组用于做出修改的函数
     if fn_i and pre_fn then
         local newfn = function(self, inst)
             local FindBestContainer = Upvaluehelper.GetUpvalue(self.TradeItem, "FindBestContainer")
