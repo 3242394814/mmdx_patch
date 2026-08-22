@@ -131,7 +131,11 @@ AddGamePostInit(function()
 
                 if aimbox then
                     local buffaction = BufferedAction(ThePlayer, aimbox, ACTIONS.STORE)
-                    ThePlayer.components.playercontroller:RemoteControllerUseItemOnSceneFromInvTile(buffaction, item) -- 作为服务器时这个函数无效
+                    if TheWorld and TheWorld.ismastersim then
+                        ThePlayer.components.inventory:ControllerUseItemOnSceneFromInvTile(item, buffaction.target, buffaction.action.code, buffaction.action.mod_name)
+                    else
+                        ThePlayer.components.playercontroller:RemoteControllerUseItemOnSceneFromInvTile(buffaction, item)
+                    end
                 elseif MOD_RPC["FINDER_REDUX"] and MOD_RPC["FINDER_REDUX"]["FIND"] then -- 兼容高亮查找 - Finder
                     SendModRPCToServer(MOD_RPC["FINDER_REDUX"]["FIND"], item.prefab)
                     ThePlayer:DoTaskInTime(0.1, function()
@@ -141,7 +145,11 @@ AddGamePostInit(function()
                             local aimbox = HIGHLITED_ENTS and HIGHLITED_ENTS[1]
                             if aimbox then
                                 local buffaction = BufferedAction(ThePlayer, aimbox, ACTIONS.STORE)
-                                ThePlayer.components.playercontroller:RemoteControllerUseItemOnSceneFromInvTile(buffaction, item) -- 作为服务器时这个函数无效
+                                if TheWorld and TheWorld.ismastersim then
+                                    ThePlayer.components.inventory:ControllerUseItemOnSceneFromInvTile(item, buffaction.target, buffaction.action.code, buffaction.action.mod_name)
+                                else
+                                    ThePlayer.components.playercontroller:RemoteControllerUseItemOnSceneFromInvTile(buffaction, item)
+                                end
                             end
                         end
                     end)
