@@ -224,7 +224,7 @@ if _G.KnownModIndex:IsModEnabledAny("workshop-3136701076") then -- 检查黑化�
                                 if IsValidEntity(ent) and not self:IsSelectedEntity(ent) and (test_fn == nil or test_fn(ent)) then
                                     local rightclick, act = is_rightclick(ent, is_right_list)
                                     if rightclick ~= nil then
-                                        if not black_action_id[act.action.id] and not black_prefab[act.target.prefab] then
+                                        if not black_action_id[act.action.id] and act.target and not black_prefab[act.target.prefab] then
                                             if act.action.id == "PICKUP" then rightclick = false end
                                             self:SelectEntity(ent, act.action.id, nil, nil, rightclick) -- 黑化排队论改了这个传的参数 原版：(ent, rightclick) 黑化排队论：(ent, actid, item, specialtag, rightclick)
                                             table.insert(selected, { ent = ent, right = rightclick })
@@ -237,7 +237,7 @@ if _G.KnownModIndex:IsModEnabledAny("workshop-3136701076") then -- 检查黑化�
                                 if IsValidEntity(ent) and not self:IsSelectedEntity(ent) and (test_fn == nil or test_fn(ent)) then
                                     local rightclick, act = is_rightclick(ent, is_right_list)
                                     if rightclick ~= nil then
-                                        if not black_action_id[act.action.id] and whitelist_mode_prefab[act.target.prefab] then
+                                        if not black_action_id[act.action.id] and act.target and whitelist_mode_prefab[act.target.prefab] then
                                             if act.action.id == "PICKUP" then rightclick = false end
                                             self:SelectEntity(ent, act.action.id, nil, nil, rightclick) -- 黑化排队论改了这个传的参数 原版：(ent, rightclick) 黑化排队论：(ent, actid, item, specialtag, rightclick)
                                             table.insert(selected, { ent = ent, right = rightclick })

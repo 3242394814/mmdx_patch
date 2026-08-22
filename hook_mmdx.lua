@@ -231,7 +231,7 @@ end)
 -- 修改“黑化排队论”模组
 AddComponentPostInit("playercontroller", function(self, inst)
     if inst ~= ThePlayer then return end
-    ThePlayer:DoTaskInTime(0, function()
+    -- ThePlayer:DoTaskInTime(0, function()
         local ActionQueuer = Upvaluehelper.FindUpvalue(self.OnControl, "ActionQueuer", "/mods/workshop%-3136701076/modmain.lua") -- 尝试获取黑化排队论的ActionQueuer
         if not ActionQueuer then MOD_util:Warning("获取 黑化排队论 模组的 ActionQueuer 失败") return end
 
@@ -316,6 +316,23 @@ AddComponentPostInit("playercontroller", function(self, inst)
             end
 
             -- 修改关于晾肉架的操作
+            -- 晒肉时，跳过已经有肉的架子
+            local STORE_breakfn = allowed_actions['STORE'].breakfn
+            allowed_actions['STORE'].breakfn = function(act)
+                if STORE_breakfn(act) then
+                    return true
+                end
+                if allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then -- 仅对晾肉架生效
+                    local num = act.target.replica.container and act.target.replica.container:GetNumSlots() or 3 -- 获取晾肉架的格子数
+                    for i = 1, num do
+                        local build, sym = act.target.AnimState:GetSymbolOverride("swap_dried" .. i)
+                        if not (build or sym) then -- 查找空格子
+                            return false
+                        end
+                    end
+                    return true -- 所有格子都有肉
+                end
+            end
             allowed_actions['STORE'].controllertable = {
                 needreturnactiveitem = function(act)
                     -- 晒肉时将鼠标上的物品放回物品栏
@@ -323,6 +340,23 @@ AddComponentPostInit("playercontroller", function(self, inst)
                             act.target and act.target.prefab and allowed_actions.RUMMAGE.meatrack_list[act.target.prefab]
                 end,
             }
+
+            local RUMMAGE_breakfn = allowed_actions['RUMMAGE'].breakfn
+            allowed_actions['RUMMAGE'].breakfn = function(act)
+                if RUMMAGE_breakfn(act) then
+                    return true
+                end
+                if allowed_actions.RUMMAGE.meatrack_list[act.target.prefab] then -- 仅对晾肉架生效
+                    local num = act.target.replica.container and act.target.replica.container:GetNumSlots() or 3 -- 获取晾肉架的格子数
+                    for i = 1, num do
+                        local build, sym = act.target.AnimState:GetSymbolOverride("swap_dried" .. i)
+                        if build or sym then -- 查找有物品的格子
+                            return false
+                        end
+                    end
+                    return not TheInput:IsKeyDown(KEY_LSHIFT) -- 所有格子都是空的 且没有按住Shift
+                end
+            end
 
             -- 兼容【古川笠的快速采集】模组，使用flag标记阻止重复开启容器
             if KnownModIndex:IsModEnabledAny("workshop-2158549297") then
@@ -348,7 +382,7 @@ AddComponentPostInit("playercontroller", function(self, inst)
             end
             return _IsControlPressed(self, key)
         end
-    end)
+    -- end)
 end)
 
 ---------------------------------------------------------------------------------------------------------------------------------------------------------
